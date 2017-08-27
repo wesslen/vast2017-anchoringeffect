@@ -17,6 +17,32 @@ STM analysis of Interaction Logs: [RMarkdown](./STMLogAnalysis.Rmd) / [HTML Outp
 
 All user level attributes are anonymized. Use user-id for matching.
 
+### Task
+
+83 participants were asked to identify and count the number of protest-related events using a Twitter-based event detection visual interface, CrystalBall. 
+
+The interface included tweets from the Twitter public streaming API for two weeks of Twitter data (Nov 10, 2016 to Nov 24, 2016).
+
+### Experiment Design
+
+Users were randomly assigned into a 2x2 between-subjects factorial design with two anchoring factors: numerical and visual.
+
+**Numerical:**
+
+Number used in relation to the users task: was the number of protests higher than XX ?
+
+*   High: 152 protests
+
+*   Low: 8 protests
+
+**Visual:**
+
+Users viewed three minute priming video focused on:
+
+*   Geo: Geo View
+
+*   Time: Calendar View
+
 ### Abstract
 
 Anchoring effect is the tendency to focus too heavily on one piece of information when making decisions. In this paper, we present a novel, systematic study and resulting analyses that investigate the effects of anchoring effect on human decision-making using visual analytic systems. Visual analytics interfaces typically contain multiple views that present various aspects of information such as spatial, temporal, and categorical. These views are designed to present complex, heterogeneous data in accessible forms that aid decision-making. However, human decision-making is often hindered by the use of heuristics, or cognitive biases, such as anchoring effect. Anchoring effect can be triggered by the order in which information is presented or the magnitude of information presented. Through carefully designed laboratory experiments, we present evidence of anchoring effect in analysis with visual analytics interfaces when users are primed by representation of different pieces of information. We also describe detailed analyses of users’ interaction logs which reveal the impact of anchoring bias on the visual representation preferred and paths of analysis. We discuss implications for future research to possibly detect and alleviate anchoring bias.
