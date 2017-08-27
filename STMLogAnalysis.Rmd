@@ -1,0 +1,900 @@
+---
+title: "CrystalBall Interaction Logs: STM Analysis"
+author: "Ryan Wesslen"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE)
+```
+
+## Load the data
+
+Load the data and convert to a data frame.
+
+```{r data}
+library(rjson)
+logs <- fromJSON(file="./data/crystalball_userlog_final.json")
+
+logs <- lapply(logs, function(x) {
+  x[sapply(x, is.null)] <- NA
+  unlist(x)
+})
+
+df <- do.call("rbind", logs)
+df <- data.frame(user = row.names(df), log = df, stringsAsFactors = F)
+
+```
+
+How many unique users do we have?
+
+```{r}
+length(unique(df$user))
+```
+
+The data excludes test accounts and four users for incomplete data. 
+
+First, reshape the data from "wide" to "long" to create the time variables.
+
+```{r}
+library(reshape)
+df <- reshape(df, varying = c("log.1","log.2","log.3","log.4","log.5",
+                              "log.6","log.7","log.8","log.9","log.10"), idvar = "user", direction = "long")
+```
+
+Next, create two custom variables for our groups.
+
+```{r}
+df$frame <- ifelse(substr(df$user,0,1)=="h","High","Low")
+df$train <- ifelse(substr(df$user,2,2)=="t","Time","Spatial")
+
+table(df$frame, df$train)/10
+
+df$time <- df$time / 10 
+```
+
+Notice that the groups are spread fairly evenly.
+
+### Appending User Attributes
+
+First, upload user-level attributes.
+
+```{r}
+atts <- readr::read_csv("./data/demographics-pretest.csv")
+```
+
+Next, use the `pairsD3` function to scatter the personality scores.
+
+```{r}
+library(pairsD3)
+
+pairsD3(atts[,9:13], group = as.factor(atts$GENDER))
+```
+
+### Personality K-Means
+
+Run a quick k=5 k-means. This was explored as a feature for personality clusters.
+
+```{r}
+kmeans <- kmeans(atts[,9:13], centers = 5, iter.max = 10, nstart =3,
+       algorithm = c("Hartigan-Wong"), trace=FALSE)
+
+pairsD3(atts[,9:13], group = as.factor(kmeans$cluster))
+
+atts$flag2 <- ifelse(kmeans$cluster=="2",1,0)
+atts$flag3 <- ifelse(kmeans$cluster=="3",1,0)
+```
+
+Alternatively, create binary flags for each personality measure. 
+
+Values above the mean are given a 1, values below are 0.
+
+```{r}
+summary(atts[,9:13])
+
+atts$ExtravertFlag <- ifelse(atts$Extraversion>mean(atts$Extraversion),1,0)
+atts$AgreeableFlag <- ifelse(atts$Agreeableness>mean(atts$Agreeableness),1,0)
+atts$ConscientiousFlag <- ifelse(atts$Conscientiousness>mean(atts$Conscientiousness),1,0)
+atts$NeuroticismFlag <- ifelse(atts$Neuroticism>mean(atts$Neuroticism),1,0)
+atts$OpennessFlag <- ifelse(atts$Openness>mean(atts$Openness),1,0)
+
+library(dplyr)
+atts %>% 
+  group_by(substr(atts$ID,1,2)) %>% 
+  summarise(extra = mean(Extraversion),
+            agree = mean(Agreeableness),
+            consc = mean(Conscientiousness),
+            neuro = mean(Neuroticism),
+            open = mean(Openness))
+```
+
+We can test significant levels with a t-test.
+
+```{r}
+t.test(atts$Agreeableness~atts$GENDER)
+```
+
+### Major & Graduate Level
+
+Last, let's create binary flags for major graduate level (Undegrad = 1, Grad/Prof = 0)
+
+```{r}
+table(atts$Occupation)
+
+atts$Undergrad <- ifelse(atts$Occupation=="Undergraduate",1,0)
+
+t.test(atts$Openness~atts$Undergrad)
+```
+
+Also, let's explore the major. I have manually created a flag (MajorS) for Computing and Non-Computing.
+
+```{r}
+table(atts$Major)
+
+table(atts$MajorS)
+
+df2 <- merge(df, atts, by.x = "user", by.y = "ID", all.x = TRUE)
+```
+
+
+
+## Log Preprocessing
+
+Let's explore an example of the log sequence.
+
+```{r}
+df$log[1]
+```
+
+Note that most of the actions are divided into two words, with a "_". The one exception is "menu date". Let's correct them and then use a string split on "-".
+
+```{r}
+alt <- c("menu date picker_click","menu_date_picker_click",
+         "social network_hover","social_network_hover",
+         "social network_navigate","social_network_navigate",
+         "social network_click","social_network_click",
+         "word cloud_click","word_cloud_click",
+         "word cloud_hover","word_cloud_hover",
+         "word cloud_navigate","word_cloud_navigate",
+         "menu_click_menu icon","menu_click_menu_icon",
+         "menu_click_button followerfriend ratio","menu_click_button_followerfriend_ratio",
+         "map_click_button date distribution","map_click_button_date_distribution",
+         "menu_click_tweet icon","menu_click_tweet_icon",
+         "map_click_button find events","map_click_button_find_events",
+         "menu_click_favorite icon","menu_click_favorite_icon",
+         "followerfriend ratio","followerfriend_ratio",
+         "tweet_click_button more","tweet_click_button_more")
+
+# replace all actions with _
+for (i in c(1,3,5,7,9,11,13,15,17,19,21,23,25,27,29)){
+  df$log <- gsub(alt[1*i],alt[1*i+1],df$log)
+}
+
+# replace " - " with " "
+df$log <- gsub(" - "," ",df$log)
+df$log <- gsub("_",".",df$log)
+df$log <- gsub("  "," ",df$log)
+
+raw <- strsplit(df$log, " ")
+
+df$actions <- as.integer(lapply(raw, length))
+df$unique.actions <- as.integer(lapply(lapply(raw, unique), length))
+
+write.csv(df, "./data/clean.csv", row.names = F)
+```
+
+Explore sample action statistics by group.
+
+```{r}
+library(tidyverse)
+
+df %>% group_by(frame, train, time) %>% summarise(AvgActions=mean(actions),
+                                            StdActions=sd(actions),
+                                            AvgUnqActions=mean(unique.actions),
+                                            StdUnqActions=sd(unique.actions))
+```
+
+While at first glance it appears that High-Time and Low-Time have very high number of actions, notice that the standard deviations are very large -- so much so that, for example, that all the other values are within 1 std dev of the largest (High-Time). This means that there is not a large enough sample to derive much statistical significance.
+
+We can plot the histograms.
+
+```{r}
+hist(df$actions, 
+     breaks = 20, 
+     main = "Histogram of Number of User Actions", 
+     xlab = "User Actions",
+     ylab = "Number of Participant by Time Decile")
+
+hist(df$unique.actions, 
+     breaks = 20, 
+     main = "Histogram of Number of Unique Actions", 
+     xlab = "Unique Actions",
+     ylab = "Number of Participant by Time Decile")
+```
+
+Note that we are getting more distinct distributions by creating more documents (e.g. by breaking down the logs by time) and adding more distinct actions. Note that there are nearly 30 unique actions now.
+
+## Bag-of-Actions Counts
+
+Let's run a bag-of-words (DFM) with a 1-3 n-gram.
+
+```{r}
+library(quanteda)
+myCorpus <- corpus(df$log)
+docvars(myCorpus, "frame") <- df$frame
+docvars(myCorpus, "train") <- df$train
+docvars(myCorpus, "time") <- df$time
+docvars(myCorpus, "extra") <- df2$ExtravertFlag
+docvars(myCorpus, "agree") <- df2$AgreeableFlag
+docvars(myCorpus, "conscient") <- df2$ConscientiousFlag
+docvars(myCorpus, "neurotic") <- df2$NeuroticismFlag
+docvars(myCorpus, "open") <- df2$OpennessFlag
+docvars(myCorpus, "gender") <- df2$GENDER
+docvars(myCorpus, "major") <- df2$MajorS
+docvars(myCorpus, "undergrad") <- df2$Undergrad
+docvars(myCorpus, "age") <- ifelse(df2$AGE>22,1,0)
+
+# run DTM 
+dfm <- dfm(myCorpus, ngrams = 1:3)
+
+# remove features not found in at least 50 "docs" -- modified from 25 when user-level
+dfm <- dfm_trim(dfm, min_docfreq = 50)
+```
+
+Let's examine the top actions...
+
+```{r}
+x <- topfeatures(dfm)
+```
+
+```{r}
+plot(tfidf(dfm))
+```
+
+We can also run a dendrogram (clustering). I left the labels off because their length (e.g. tri-actions) is too long.
+
+```{r}
+wordDfm <- sort(weight(dfm, "tf"))
+wordDfm <- t(wordDfm)[1:50,]  # keep the top 50 words
+wordDistMat <- dist(wordDfm)
+wordCluster <- hclust(wordDistMat)
+
+# Define nodePar
+plot(wordCluster, main="Frequency weighting (Labels Removed)", xlab=NA, sub=NA, labels = F)
+```
+
+## Structural Topic Modeling
+
+Let's convert our data to the `stmdfm`.
+
+```{r results="hide"}
+library(stm)
+
+# use quanteda converter to convert our Dfm
+stmdfm <- convert(dfm, to = "stm", docvars = docvars(myCorpus))
+
+out <- prepDocuments(stmdfm$documents, stmdfm$vocab, stmdfm$meta, lower.thresh = 50)
+```
+
+### Search for K
+
+Let's first run a model search to obtain the number of topics.
+
+```{r results="hide"}
+c <- c(5,8,10,15,20,30,40)
+
+kresult <- searchK(out$documents, 
+                   out$vocab, 
+                   K = c, 
+                   prevalence=~ s(time,5) + train + frame, 
+                   data=out$meta, 
+                   max.em.its = 100,
+                   seed = 300
+                   )
+plot(kresult)
+```
+
+From this analysis, we decided on 8 topics given the high semantic coherence, relatively high held-out likelihood and parsimony. One key reason was we found 8 topics is where we found the "elbow" of the held-out likelihood. Note: we decided on 8 topics rather than 10 topics (e.g. since lower average Semantic Coherence) because the two additional topics simply broke out the Map View and Calendar View into to separate topics respectively (Map View Pan and Click, and Calendar View Dotted vs Solid Line). Collectively, we decided for the sake of parsimony, it would make more sense to keep these two views together rather than seperated. 
+
+We tested our model results (estimated anchor bias effects) with both (8 or 10 topics) and found both results were consistent.
+
+### Run Baseline Model
+
+Let's run the model with three covariates: time (b-spline), training and framing.
+
+```{r results="hide"}
+k <- 8
+
+stmFit <- stm(out$documents, out$vocab, K = k, prevalence =~ s(time,5) + train + frame, 
+              max.em.its = 150, data = out$meta, init.type = "Spectral", seed = 300)
+```
+
+Using the word probabilities, let's give each topic the name of the first action (for simplicity).
+
+```{r}
+topicNames <- labelTopics(stmFit)
+topic <- data.frame(
+  topicnames = c('Word Cloud: Navigation',
+                 'Social Network: Navigation',
+                 'Event List: All Tools',
+                 'Social Network & Word Cloud',
+                 'Word Cloud: Click',
+                 'Calender View',
+                 'Event Location & Flower Glyph',
+                 'Map View'
+  ),
+  TopicNumber = 1:k,
+  TopicProportions = colMeans(stmFit$theta))
+```
+
+Let's plot the topic sizes.
+
+```{r}
+plot(stmFit, 
+         type = "summary", 
+         xlim = c(0,.45),
+         ylim = c(0.2,8.4),
+         custom.labels = topic$topicnames,
+         main = "Topic Proportions by Interaction Clusters", 
+         text.cex = 1)
+```
+
+Next, let's calculate the effect of the two factors (frame = High or Low, and train = Geo or Time).
+
+```{r}
+prep <- estimateEffect(1:k ~ s(time,5) + frame + train, stmFit, meta = out$meta, uncertainty = "Global")
+```
+
+### Effect of Visual Anchor
+
+We can then use the `plot.estimateEffect` function to compare the effect of the "train" field (Geo or Time) on topic proportions (likelihood of the topic).
+
+```{r train-plot, fig.height = 8, fig.width = 8, include=FALSE}
+Result <- plot(prep, "train", method = "difference", 
+               cov.value1 = "Time", cov.value2 = "Spatial", 
+               verbose.labels = F, 
+               custom.labels = topic$topicnames,
+               labeltype = "custom",
+               ylab = "Expected Difference in Topic Probability by Training (with 95% CI)", 
+               xlab = "More Likely Geo                          Not Significant                       More Likely Time",
+               main = "Effect of Training on Topic Proportions",
+               xlim = c(-0.2,0.2))
+```
+
+We can then rank the topics by their point estimates.
+
+```{r}
+# order based on Expected Topic Proportion
+trank = order(topic$TopicProportions, decreasing = T)
+temp.topic <- topic[trank,]
+
+x <- plot(prep, "train", method = "difference", model = stmFit,
+     cov.value1 = "Time", cov.value2 = "Spatial", 
+     verbose.labels = F, 
+     topics = temp.topic$TopicNumber,
+     custom.labels = temp.topic$topicnames,
+     #custom.labels = " ",
+     labeltype = "custom",
+     ylab = "Expected Topic Difference", 
+     xlab = "Geo              Not Significant           Time",
+     main = "Effect of Visual Anchor",
+     xlim = c(-0.2,0.2),
+          ylim = c(0.4,8.4),
+     width = 40,
+     ci.level = 0.95)
+```
+
+
+### Effect of Numeric Anchor
+
+```{r frame-plot, fig.height = 8, fig.width=8, include=FALSE}
+Result <- plot(prep, "frame", method = "difference", 
+               cov.value1 = "High", cov.value2 = "Low", 
+               verbose.labels = F, 
+               custom.labels = topic$topicnames,
+               labeltype = "custom",
+               ylab = "Expected Difference in Topic Probability by Framing (with 95% CI)", 
+               xlab = "More Likely Low                          Not Significant                       More Likely High",
+               main = "Effect of Framing on Topic Proportions",
+               xlim = c(-0.2,0.2), 
+               width = 40)
+```
+
+```{r}
+# optional: order based on Topic Prevalance 
+frank = order(unlist(Result$means))
+#temp.topic <- topic[frank,]
+
+plot(prep, "frame", method = "difference", model = stmFit,
+     cov.value1 = "High", cov.value2 = "Low", 
+     verbose.labels = F, 
+     topics = temp.topic$TopicNumber,
+     custom.labels = temp.topic$topicnames,
+     #custom.labels = " ",
+     labeltype = "custom",
+     ylab = "Expected Topic Difference (95% CI)", 
+     xlab = "Low              Not Significant           High",
+     main = "Effect of Numerical Anchor",
+     xlim = c(-0.2,0.2), 
+     ylim = c(0.4,8.4),
+     width = 40,
+     ci.level = 0.95)
+```
+
+### Effect of Time
+
+95% confidence intervals have been added.
+
+```{r time-plot}
+par(mfrow = c(2,2),mar = c(4,4,2,2))
+for (i in trank){
+  plot(prep, "time", method = "continuous", topics = i, model = z,  
+       main = paste0(topic$topicnames[i]),
+       printlegend = FALSE, ylab = "Exp. Topic Prob", 
+       xlab = "Time (Deciles of Action)", ylim = c(-0.01,0.5),
+       ci.level = 0.95
+  )
+}
+```
+
+### Interaction: Time & Visual Anchor
+
+```{r finteraction}
+par(mfrow = c(2,2),mar = c(4,4,2,2))
+for (i in trank){
+  plot(prep, "time", method = "continuous", topics = i, main = paste0(topic$topicnames[i]),
+       printlegend = FALSE, ylab = "Exp. Topic Prob", xlab = "Time (Deciles of Action)",
+       moderator = "train", moderator.value = "Time",  linecol = "red", ylim = c(-0.01 ,0.5),
+       ci.level = 0)
+  plot(prep, "time", method = "continuous", topics = i,
+       printlegend = FALSE, ylab = "Exp. Topic Prob", xlab = "Time (Deciles of Action)",
+       moderator = "train", moderator.value = "Spatial",  linecol = "blue", add = "T", 
+       ylim = c(-0.01 ,0.5), ci.level = 0)
+
+  legend(0.65, 0.5, c("Time", "Geo"), lwd = 2, col = c("red", "blue"))
+}
+```
+
+### Interaction: Time & Numeric Anchor
+
+```{r interaction}
+par(mfrow = c(2,2),mar = c(4,4,2,2))
+for (i in frank){
+  plot(prep, "time", method = "continuous", topics = i, main = paste0(topic$topicnames[i]),
+       printlegend = FALSE, ylab = "Exp. Topic Prob", xlab = "Time (Deciles of Action)",
+       moderator = "frame", moderator.value = "High",  linecol = "green", ylim = c(-0.01 ,0.5),
+       ci.level = 0)
+  plot(prep, "time", method = "continuous", topics = i,
+       printlegend = FALSE, ylab = "Exp. Topic Prob", xlab = "Time (Deciles of Action)",
+       moderator = "frame", moderator.value = "Low",  linecol = "brown", add = "T", 
+       ylim = c(-0.01 ,0.5), ci.level = 0)
+  legend(0.65, 0.5, c("Low", "High"), lwd = 2, col = c("brown", "green"))
+}
+```
+
+## Personality Covariates
+
+Let's keep time and training and used different binary flags.
+
+```{r include=FALSE}
+stmFit2 <- stm(out$documents, out$vocab, K = k, 
+               prevalence =~ s(time,5) + train + extra + agree + conscient + neurotic + open, 
+               max.em.its = 150, data = out$meta, init.type = "Spectral", seed = 300)
+```
+
+```{r}
+topicNames2 <- labelTopics(stmFit2)
+topic2 <- data.frame(
+    topicnames = c('Word Cloud: Navigation',
+                 'Social Network: Navigation',
+                 'Event List: All Tools',
+                 'Social Network & Word Cloud',
+                 'Word Cloud: Click',
+                 'Calender View',
+                 'Event Location & Flower Glyph',
+                 'Map View'
+  ),
+  TopicNumber = 1:k,
+  TopicProportions = colMeans(stmFit2$theta))
+```
+
+```{r, fig.height=6, fig.width=8, include=FALSE}
+plot(stmFit2, 
+         type = "summary", 
+         xlim = c(0,.5), 
+         n =1,
+         main = "Log (Action) Topics", 
+         text.cex = 1)
+```
+
+```{r, include=FALSE}
+prep2 <- estimateEffect(1:k ~ s(time,5) + train + extra + agree + conscient + neurotic + open, 
+                        stmFit2, meta = out$meta, uncertainty = "Global")
+```
+
+### Effect of Extravert
+
+```{r extra}
+extraResult <- plot(prep2, "extra", method = "difference",
+               cov.value1 = "1", cov.value2 = "0", 
+               verbose.labels = F,
+               model = stmFit2,
+               labeltype = "custom",
+               custom.labels = topic2$topicnames,
+               #custom.labels = " ",
+               ylab = "Exp Topic Difference", 
+               xlab = "Low          Not Significant          High",
+               main = "Effect of Extraversion",
+               xlim = c(-0.2,0.2),
+               ylim = c(0.4,8.4),
+               ci.level = 0.95, 
+               width = 40)
+```
+
+### Effect of Agreeable
+
+```{r agree}
+agreeResult <- plot(prep2, "agree", method = "difference",
+               cov.value1 = "1", cov.value2 = "0", 
+               verbose.labels = F,
+               model = stmFit2,
+               labeltype = "custom",
+               custom.labels = topic2$topicnames,
+               #custom.labels = " ",
+               ylab = "Exp Topic Difference", 
+               xlab = "Low          Not Significant          High",
+               main = "Effect of Agreeableness",
+               xlim = c(-0.2,0.2),
+               ylim = c(0.4,8.4),
+               ci.level = 0.95,
+               width = 40)
+```
+
+### Effect of Conscientious
+
+```{r consc}
+consResult <- plot(prep2, "conscient", method = "difference",
+               cov.value1 = "1", cov.value2 = "0", 
+               verbose.labels = F,
+               model = stmFit2,
+               labeltype = "custom",
+               custom.labels = topic2$topicnames,
+               #custom.labels = " ",
+               ylab = "Exp Topic Difference", 
+               xlab = "Low          Not Significant          High",
+               main = "Effect of Conscientiousness",
+               xlim = c(-0.2,0.2),
+               ylim = c(0.4,8.4),
+               ci.level = 0.95,
+               width = 40)
+```
+
+### Effect of Neurotic
+
+```{r neurotic}
+neuroResult <- plot(prep2, "neurotic", method = "difference",
+               cov.value1 = "1", cov.value2 = "0", 
+               verbose.labels = F,
+               model = stmFit2,
+               labeltype = "custom",
+               custom.labels = topic2$topicnames,
+               #custom.labels = " ",
+               ylab = "Exp Topic Difference", 
+               xlab = "Low          Not Significant          High",
+               main = "Effect of Neuroticism",
+               xlim = c(-0.2,0.2),
+               ylim = c(0.4,8.4),
+               ci.level = 0.95,
+               width = 40)
+```
+
+### Effect of Openness
+
+```{r open}
+openResult <- plot(prep2, "open", method = "difference",
+               cov.value1 = "1", cov.value2 = "0", 
+               verbose.labels = F,
+               model = stmFit2,
+               labeltype = "custom",
+               custom.labels = topic2$topicnames,
+               #custom.labels = " ",
+               ylab = "Exp Topic Difference", 
+               xlab = "Low          Not Significant          High",
+               main = "Effect of Openness",
+               xlim = c(-0.2,0.2),
+               ylim = c(0.4,8.4),
+               ci.level = 0.95,
+               width = 40)
+```
+
+### Combined Effect
+
+This matrix scatter plot shows the values of the estimated effects for each topic by each of the five binary variables.
+
+```{r}
+
+df3 <- data.frame(label = unlist(agreeResult$labels),
+                  Agreeable = unlist(agreeResult$means),
+                  Conscientious = unlist(consResult$means),
+                  Extravert = unlist(extraResult$means),
+                  Neurotic = unlist(neuroResult$means),
+                  Openness = unlist(openResult$means))
+
+
+# another option
+makePairs <- function(data) 
+{
+  grid <- expand.grid(x = 1:ncol(data), y = 1:ncol(data))
+  grid <- subset(grid, x != y)
+  all <- do.call("rbind", lapply(1:nrow(grid), function(i) {
+    xcol <- grid[i, "x"]
+    ycol <- grid[i, "y"]
+    data.frame(xvar = names(data)[ycol], yvar = names(data)[xcol], 
+               x = data[, xcol], y = data[, ycol], data)
+  }))
+  all$xvar <- factor(all$xvar, levels = names(data))
+  all$yvar <- factor(all$yvar, levels = names(data))
+  densities <- do.call("rbind", lapply(1:ncol(data), function(i) {
+    data.frame(xvar = names(data)[i], yvar = names(data)[i], x = data[, i])
+  }))
+  list(all=all, densities=densities)
+}
+ 
+# expand iris data frame for pairs plot
+gg1 = makePairs(df3[,2:6])
+
+# pairs plot
+# https://gastonsanchez.wordpress.com/2012/08/27/scatterplot-matrices-with-ggplot/
+ggplot(gg1$all, aes_string(x = "x", y = "y")) + 
+  facet_grid(xvar ~ yvar, scales = "free") + 
+  xlim(-0.05,0.05) + ylim(-0.05,0.05) +
+  geom_point( na.rm = TRUE, alpha=0.8) +
+  #geom_point(aes(colour=Species), na.rm = TRUE, alpha=0.8) + 
+  stat_density(aes(x = x, y = ..scaled.. * diff(range(x)) + min(x)), 
+               data = gg1$densities, position = "identity", 
+               colour = "grey20", geom = "line")
+
+```
+
+## Gender Covariate
+
+Let's run Male/Female as a covariate.
+
+```{r include = FALSE}
+stmFit3 <- stm(out$documents, out$vocab, K = k, prevalence =~ s(time,5) + train + gender, 
+              max.em.its = 150, data = out$meta, init.type = "Spectral", seed = 300)
+```
+
+```{r, include=FALSE}
+topicNames <- labelTopics(stmFit3)
+topic <- data.frame(
+    topicnames = c('Word Cloud: Navigation',
+                 'Social Network: Navigation',
+                 'Event List: All Tools',
+                 'Social Network & Word Cloud',
+                 'Word Cloud: Click',
+                 'Calender View',
+                 'Event Location & Flower Glyph',
+                 'Map View'
+  ),
+  TopicNumber = 1:k,
+  TopicProportions = colMeans(stmFit3$theta))
+```
+
+```{r, fig.height=6, fig.width=8, include=FALSE}
+plot(stmFit3, 
+         type = "summary", 
+         xlim = c(0,.3), 
+        n =1,
+         main = "Log (Action) Topics", 
+         text.cex = 1)
+```
+
+```{r, include=FALSE}
+prep3 <- estimateEffect(1:k ~ s(time,5) + train + gender, stmFit3, meta = out$meta, uncertainty = "Global")
+```
+
+### Effect of Gender
+
+```{r gender}
+Result <- plot(prep3, "gender", method = "difference", 
+               cov.value1 = "F", cov.value2 = "M", 
+               verbose.labels = F, 
+               model = stmFit3,
+               labeltype = "custom",
+               custom.labels = topic2$topicnames,
+               #custom.labels = " ",
+               ylab = "Exp Topic Difference", 
+               xlab = "Male          Not Significant        Female",
+               main = "Effect of Gender",
+               xlim = c(-0.2,0.2),
+               ylim = c(0.4,8.4),
+               ci.level = 0.95,
+               width = 40)
+```
+
+Result: No Significant Actions (Topics)
+
+## Education Level Covariate
+
+We'll use a binary flag for undergraduates (1) and graduate students (0).
+
+```{r include = FALSE}
+stmFit4 <- stm(out$documents, out$vocab, K = k, prevalence =~ s(time,5) + train + undergrad, 
+              max.em.its = 150, data = out$meta, init.type = "Spectral", seed = 300)
+```
+
+```{r include=FALSE}
+topicNames <- labelTopics(stmFit4)
+topic <- data.frame(
+    topicnames = c('Word Cloud: Navigation',
+                 'Social Network: Navigation',
+                 'Event List: All Tools',
+                 'Social Network & Word Cloud',
+                 'Word Cloud: Click',
+                 'Calender View',
+                 'Event Location & Flower Glyph',
+                 'Map View'
+  ),
+  TopicNumber = 1:k,
+  TopicProportions = colMeans(stmFit4$theta))
+```
+
+```{r, fig.height=6, fig.width=8, include=FALSE}
+plot(stmFit4, 
+         type = "summary", 
+         xlim = c(0,.3), 
+        n =1,
+         main = "Log (Action) Topics", 
+         text.cex = 1)
+```
+
+```{r, include=FALSE}
+prep4 <- estimateEffect(1:k ~ s(time,5) + train + undergrad, stmFit4, meta = out$meta, uncertainty = "Global")
+```
+
+### Effect of Education Level
+
+```{r undergrad}
+Result <- plot(prep4, "undergrad", method = "difference", 
+               cov.value1 = "0", cov.value2 = "1", 
+               verbose.labels = F, 
+               model = stmFit4,
+               labeltype = "custom",
+               custom.labels = topic2$topicnames,
+               #custom.labels = " ",
+               ylab = "Exp Topic Difference", 
+               xlab = "Undergrad        Not Significant        Graduate",
+               main = "Effect of Education Level",
+               xlim = c(-0.2,0.2),
+               ylim = c(0.4,8.4),
+               ci.level = 0.95,
+               width = 40)
+```
+
+## Major Covariate
+
+We'll use a binary flag for major: computing-related (1) and non-computing (social sciences and humanities) (0).
+
+```{r include = FALSE}
+
+stmFit5 <- stm(out$documents, out$vocab, K = k, prevalence =~ s(time,5) + train + major, 
+              max.em.its = 150, data = out$meta, init.type = "Spectral", seed = 300)
+```
+
+```{r include=FALSE}
+topicNames <- labelTopics(stmFit5)
+topic <- data.frame(
+  topicnames = c('Word Cloud: Navigation',
+                 'Social Network: Navigation',
+                 'Event List: All Tools',
+                 'Social Network & Word Cloud',
+                 'Word Cloud: Click',
+                 'Calender View',
+                 'Event Location & Flower Glyph',
+                 'Map View'
+  ),
+  TopicNumber = 1:k,
+  TopicProportions = colMeans(stmFit5$theta))
+```
+
+```{r include=FALSE}
+plot(stmFit5, 
+         type = "summary", 
+         xlim = c(0,.3), 
+        n =1,
+         main = "Log (Action) Topics", 
+         text.cex = 1)
+```
+
+```{r include=FALSE}
+prep5 <- estimateEffect(1:k ~ s(time,5) + train + major, stmFit5, meta = out$meta, uncertainty = "Global")
+```
+
+### Effect of Major
+
+```{r major}
+Result <- plot(prep5, "major", method = "difference", 
+               cov.value1 = "0", cov.value2 = "1", 
+               verbose.labels = F, 
+               model = stmFit5,
+               labeltype = "custom",
+               custom.labels = topic2$topicnames,
+               #custom.labels = " ",
+               ylab = "Exp Topic Difference", 
+               xlab = "Computing    Not Significant  Non-Computing",
+               main = "Effect of Major",
+               xlim = c(-0.2,0.2),
+               ylim = c(0.4,8.4),
+               ci.level = 0.95,
+               width = 40)
+```
+
+## Age Covariate
+
+We'll use a binary flag for age: over 23 or older (1) or under 23 (0).
+
+```{r include = FALSE}
+
+stmFit5 <- stm(out$documents, out$vocab, K = k, prevalence =~ s(time,5) + train + age, 
+              max.em.its = 150, data = out$meta, init.type = "Spectral", seed = 300)
+```
+
+```{r include=FALSE}
+topicNames <- labelTopics(stmFit5)
+topic <- data.frame(
+  topicnames = c('Word Cloud: Navigation',
+                 'Social Network: Navigation',
+                 'Event List: All Tools',
+                 'Social Network & Word Cloud',
+                 'Word Cloud: Click',
+                 'Calender View',
+                 'Event Location & Flower Glyph',
+                 'Map View'
+  ),
+  TopicNumber = 1:k,
+  TopicProportions = colMeans(stmFit5$theta))
+```
+
+```{r include=FALSE}
+plot(stmFit5, 
+         type = "summary", 
+         xlim = c(0,.3), 
+        n =1,
+         main = "Log (Action) Topics", 
+         text.cex = 1)
+```
+
+```{r include=FALSE}
+prep5 <- estimateEffect(1:k ~ s(time,5) + train + age, stmFit5, meta = out$meta, uncertainty = "Global")
+```
+
+### Effect of Age
+
+```{r age}
+Result <- plot(prep5, "age", method = "difference", 
+               cov.value1 = "1", cov.value2 = "0", 
+               verbose.labels = F, 
+               model = stmFit5,
+               custom.labels = topic$topicnames,
+               #custom.labels = " ",
+               labeltype = "custom",
+               ylab = "Exp Topic Difference", 
+               xlab = "18-22           Not Significant        23+ Older",
+               main = "Effect of Age",
+               xlim = c(-0.2,0.2),
+               ylim = c(0.4,8.4),
+               ci.level = 0.95,
+               width = 40)
+```
+
+## Save Image and Packages Used
+
+```{r}
+save.image(file = "./data/stmimage.Rdata")
+sessionInfo()
+```
