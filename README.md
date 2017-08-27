@@ -6,6 +6,17 @@ Cho, Isaac, Ryan Wesslen, Alireza Karduni, Sashank Santhanam, Samira Shaikh and 
 
 STM analysis of Interaction Logs: [RMarkdown](./STMLogAnalysis.Rmd) / [HTML Output](https://rawgit.com/wesslen/vast2017-anchoringeffect/master/STMLogAnalysis.html)
 
+### Data
+
+| format | Description            |
+| ------ | ---------------------- |
+| json   | [Raw Interaction Logs](./data/crystallball_userlog_final.json) |
+| csv    | [Processed Interaction Logs](./data/clean.csv) |
+| csv    | [User Attributes](./data/demographics-pretest.csv) |
+| Rdata  | [R Data Image of STM Results](./data/stmimage.Rdata) |
+
+All user level attributes are anonymized. Use user-id for matching.
+
 ### Abstract
 
 Anchoring effect is the tendency to focus too heavily on one piece of information when making decisions. In this paper, we present a novel, systematic study and resulting analyses that investigate the effects of anchoring effect on human decision-making using visual analytic systems. Visual analytics interfaces typically contain multiple views that present various aspects of information such as spatial, temporal, and categorical. These views are designed to present complex, heterogeneous data in accessible forms that aid decision-making. However, human decision-making is often hindered by the use of heuristics, or cognitive biases, such as anchoring effect. Anchoring effect can be triggered by the order in which information is presented or the magnitude of information presented. Through carefully designed laboratory experiments, we present evidence of anchoring effect in analysis with visual analytics interfaces when users are primed by representation of different pieces of information. We also describe detailed analyses of users’ interaction logs which reveal the impact of anchoring bias on the visual representation preferred and paths of analysis. We discuss implications for future research to possibly detect and alleviate anchoring bias.
