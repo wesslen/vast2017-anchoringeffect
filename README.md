@@ -19,7 +19,7 @@ All user level attributes are anonymized. Use user-id for matching.
 
 ### Task
 
-83 participants were asked to identify and count the number of protest-related events using a Twitter-based event detection visual interface, CrystalBall. 
+85 participants were asked to identify and count the number of protest-related events using a Twitter-based event detection visual interface, CrystalBall. Users viewed a five minute training video, a three minute priming video (treatment), and given 30 minutes to complete the task. The interface recorded users' interaction log.
 
 The interface included tweets from the Twitter public streaming API for two weeks of Twitter data (Nov 10, 2016 to Nov 24, 2016).
 
@@ -74,7 +74,7 @@ Side by side visualization of GeoNetwork and TimeNetwork. The size of nodes is p
 
 The figure on the left provides the expected topic (action-cluster) proportions with judgmental labels to aid in interpretation. The figures on the right provide the estimated effect of the visual and numerical anchors on each of the eight topics’ proportions. The dot is the point estimate and the line represents a 95 percent confidence interval. The red dots/lines are topics that are significant with 95% confidence.
 
-**STM Analysis of temporal effects on sample interaction clusters (topics)**
+**STM Analysis of temporal effects on two interaction clusters (topics)**
 
 <img src="./img/Time-Interaction.png" width="50%">
 
