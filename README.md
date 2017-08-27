@@ -10,7 +10,7 @@ STM analysis of Interaction Logs: [RMarkdown](./STMLogAnalysis.Rmd) / [HTML Outp
 
 | format | Description            |
 | ------ | ---------------------- |
-| json   | [Raw Interaction Logs](./data/crystallball_userlog_final.json) |
+| json   | [Raw Interaction Logs](./data/crystalball_userlog_final.json) |
 | csv    | [Processed Interaction Logs](./data/clean.csv) |
 | csv    | [User Attributes](./data/demographics-pretest.csv) |
 | Rdata  | [R Data Image of STM Results](./data/stmimage.Rdata) |
