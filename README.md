@@ -26,14 +26,14 @@ The right figure displays main user interaction logs of the Crystalball interfac
 **Network analysis of user interactions by Geo vs Time visual anchors**
 
 
-<img src="./img/GeoVsTime.png" width="100%">
+<img src="./img/network.png" width="100%">
 
 Side by side visualization of GeoNetwork and TimeNetwork. The size of nodes is proportional to Pagerank values of nodes in each graph, the color of nodes corresponds to the detected community of each node, and the width of each edges corresponds to the weight of that edges. The bar charts show the top 5 nodes based on their Pagerank value and is color coded based the community the nodes community.
 
 **STM Analysis of the visual and numerical anchors**
 
 
-<img src="./img/STM-Summary-Tables.png" width="100%">
+<img src="./img/STM.png" width="100%">
 
 The figure on the left provides the expected topic (action-cluster) proportions with judgmental labels to aid in interpretation. The figures on the right provide the estimated effect of the visual and numerical anchors on each of the eight topics’ proportions. The dot is the point estimate and the line represents a 95 percent confidence interval. The red dots/lines are topics that are significant with 95% confidence.
 
