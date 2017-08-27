@@ -3,10 +3,10 @@ Cho, Isaac, Ryan Wesslen, Alireza Karduni, Sashank Santhanam, Samira Shaikh and 
 [STM analysis of Logs RMarkdown](./STMLogAnalysis.Rmd)
 [STM analysis of Logs HTML Output](https://rawgit.com/wesslen/vast2017-anchoringeffect/master/STMLogAnalysis.html)
 
-[](./img/overview.png)!
+![](./img/overview.png)
 
-[](./img/GeoVsTime.png)!
+![](./img/GeoVsTime.png)
 
-[](./img/STM-Summary-Tables.png)!
+![](./img/STM-Summary-Tables.png)
 
-[](./img/Time-Interaction.png)!
+![](./img/Time-Interaction.png)
