@@ -17,7 +17,7 @@ Anchoring effect is the tendency to focus too heavily on one piece of informatio
 **User interface used for the study (CrystalBall)**
 
 
-<img src="./img/overview.png" width="70%">
+<img src="./img/overview.png" width="100%">
 
  
 
