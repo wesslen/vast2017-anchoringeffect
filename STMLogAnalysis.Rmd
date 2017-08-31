@@ -313,10 +313,14 @@ stmFit <- stm(out$documents, out$vocab, K = k, prevalence =~ s(time,5) + train +
               max.em.its = 150, data = out$meta, init.type = "Spectral", seed = 300)
 ```
 
-Using the word probabilities, let's give each topic the name of the first action (for simplicity).
+```{r}
+topicNames <- labelTopics(stmFit, n = 5)
+t(topicNames$prob)
+```
+
+Using the word probabilities (top 5), let's give each topic the name of the first action (for simplicity).
 
 ```{r}
-topicNames <- labelTopics(stmFit)
 topic <- data.frame(
   topicnames = c('Word Cloud: Navigation',
                  'Social Network: Navigation',

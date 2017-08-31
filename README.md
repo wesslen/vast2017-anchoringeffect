@@ -19,7 +19,9 @@ All user level attributes are anonymized. Use user-id for matching.
 
 ### Task
 
-85 participants were asked to identify and count the number of protest-related events using a Twitter-based event detection visual interface, CrystalBall. Users viewed a five minute training video, a three minute priming video (treatment), and given 30 minutes to complete the task. The interface recorded users' interaction log.
+85 participants were asked to identify and count the number of protest-related events using a Twitter-based event detection visual interface, CrystalBall. Users viewed a five minute training video, a three minute priming video (treatment), and given 30 minutes to complete the task. Their interactions were recorded as interaction logs. 
+
+Users also completed pre and post questionaires on demographics, personality and personal bias.
 
 The interface included tweets from the Twitter public streaming API for two weeks of Twitter data (Nov 10, 2016 to Nov 24, 2016).
 
@@ -29,7 +31,7 @@ Users were randomly assigned into a 2x2 between-subjects factorial design with t
 
 **Numerical:**
 
-Number used in relation to the users task: was the number of protests higher than XX ?
+Number used in relation to the users' task: was the number of protests higher than XX ?
 
 *   High: 152 protests
 
@@ -37,7 +39,7 @@ Number used in relation to the users task: was the number of protests higher tha
 
 **Visual:**
 
-Users viewed three minute priming video focused on:
+Participants viewed three minute priming video focused on:
 
 *   Geo: Geo View
 
